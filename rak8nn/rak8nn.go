@@ -1,5 +1,11 @@
 package rak8nn
 
+/* rak8nn is a driver for an RAK8nn loraWan modem. Currently only the RAK811
+* is supported. Interaction with the modem is via Hayes 'at'-style commands.
+*
+* See https://docs.rakwireless.com/Product-Categories/WisDuo/RAK811-Module/Overview/
+ */
+
 import (
 	"bytes"
 	"errors"
@@ -28,6 +34,12 @@ type DataBlock struct {
 	data    []byte
 }
 
+// StatusErr is an implementation of error interface to include a Status integer
+type StatusErr struct {
+	Status  Status
+	Message string
+}
+
 // Status is used for error reporting - see StatusErr
 type Status int
 
@@ -40,20 +52,15 @@ const (
 	UnrecoverableError
 )
 
+// program control constants
 const (
-	joinRetries = 5 // Number of times to try joiniing LoraWan network
+	joinRetries = 5  // Number of times to try joiniing LoraWan network
+	charDelay   = 50 //  Milliseconds to pause between each character to avoid
+	// prematurely exhausing buffer
+	commandDelay = 500 // Milliseconds to wait after command to check the modem buffer
 )
 
-// StatusErr is an implementation of error interface to include a Status integer
-type StatusErr struct {
-	Status  Status
-	Message string
-}
-
-func (se StatusErr) Error() string {
-	return se.Message
-}
-
+// Modem commands and responses
 const (
 	joinCommand    = "at+join\r\n"
 	versionCommand = "at+version\r\n"
@@ -63,20 +70,14 @@ const (
 	errorResponse  = "ERROR:"
 )
 
+func (se StatusErr) Error() string {
+	return se.Message
+}
+
 // Device is an implementation of Interface Network for RAK8nn devices - currently only RAK811 supported
 type Device struct {
 	uart *machine.UART
 }
-
-/*
-func ( device *Device) Configure (baudRate uint32) error {
-	config := machine.UARTConfig {
-		BaudRate: baudRate,
-
-	}
-
-}
-*/
 
 // Join an RAK8nn device to a LoraWan network
 func (d *Device) Join() error {
@@ -88,8 +89,7 @@ func (d *Device) Join() error {
 	//try connecting up to five times
 
 	for i := 0; i < joinRetries; i++ {
-		cr, data, mc, err := d.command([]byte(joinCommand), 10)
-		fmt.Print(cr, data, mc, err)
+		_, _, _, err := d.command([]byte(joinCommand))
 
 		if err == nil {
 			connected = true
@@ -97,8 +97,6 @@ func (d *Device) Join() error {
 		}
 
 	}
-
-	fmt.Print(connected)
 
 	if connected {
 		return nil
@@ -116,8 +114,7 @@ func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 	var command []byte
 	command = []byte(fmt.Sprintf(uploadCommand, channel, data))
 
-	fmt.Print(command)
-	_, dd, mc, err := d.command([]byte(command), 10) // discard command response (debugging only)
+	_, dd, mc, err := d.command([]byte(command)) // discard command response (debugging only)
 
 	if err != nil {
 		return nil, StatusErr{
@@ -139,26 +136,22 @@ else {
 }
 */
 
-// Initialise does whatever i needed to get device ready for comms. At very least clears out
+// Initialise does whatever I needed to get device ready for comms. At very least clears out
 // any unread bytes from I/O buffer
 func (d *Device) Initialise() error {
 
 	// Send a 'version' command - this wakes up the modem and we can read out the buffers
 
-	commandResponse, data, modemCode, err := d.command([]byte(versionCommand), 0)
-	fmt.Println(commandResponse)
-	fmt.Println(modemCode)
-	fmt.Println(err)
-	fmt.Println(data)
+	_, _, _, err := d.command([]byte(versionCommand))
 
 	return err
 }
 
-// command is a utility to send an at-type command to the modem and interpret the response
+// command is an internal utility to send an at-type command to the modem and interpret the response
 // also passes back the text of the response (commandResponse) to help with debugging/tracing
 // As this is a Cat A device, some data may be returned after an uplink - this is returned in data.
 // All commands are a bit slow - join in particular takes seconds.
-func (d *Device) command(command []byte, responseDelay uint32) (commandResponse []byte, data *DataBlock, modemCode int64, err error) {
+func (d *Device) command(command []byte) (commandResponse []byte, data *DataBlock, modemCode int64, err error) {
 
 	// No validation at this stage!
 
@@ -166,11 +159,8 @@ func (d *Device) command(command []byte, responseDelay uint32) (commandResponse 
 
 	d.uart.Write(command)
 
-	time.Sleep(time.Second) // Brief pause....
-
 	// we should always get something back from the modem - allow up to 60s
 	// for this
-
 	for x := 0; x < 60; x++ {
 		if d.uart.Buffered() > 0 {
 			break
@@ -178,7 +168,7 @@ func (d *Device) command(command []byte, responseDelay uint32) (commandResponse 
 		time.Sleep(time.Second)
 	}
 
-	//time.Sleep(time.Second) // Brief pause....
+	time.Sleep(commandDelay * time.Millisecond) // Brief pause to allow buffer to fill a bit
 
 	// read out the buffer *should* end in \r\n
 	n := d.uart.Buffered()
@@ -189,12 +179,10 @@ func (d *Device) command(command []byte, responseDelay uint32) (commandResponse 
 		if inByte != 0xf0 {
 			commandResponse = append(commandResponse, inByte)
 		}
-		time.Sleep(50 * time.Millisecond) // Slow it down a bit
+		time.Sleep(charDelay * time.Millisecond) // Slow it down a bit
 		n = d.uart.Buffered()
 	}
 	// Check for ERROR: nn type responses
-
-	fmt.Print(commandResponse)
 
 	if len(commandResponse) > 8 {
 
@@ -220,9 +208,6 @@ func (d *Device) command(command []byte, responseDelay uint32) (commandResponse 
 	}
 
 	// check for an OK response
-
-	fmt.Print(commandResponse)
-
 	if len(commandResponse) < 2 {
 		// no idea what this is
 		return commandResponse, nil, 0, StatusErr{
