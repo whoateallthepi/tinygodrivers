@@ -7,6 +7,10 @@ import (
 	"github.com/whoateallthepi/tinygodrivers/rak8nn"
 )
 
+// Interface for lorawan
+type lorawan rak8nn.Networker
+
+/*
 func join(n rak8nn.Networker) error {
 	err := n.Join()
 	return err
@@ -28,6 +32,7 @@ func upload(n rak8nn.Networker, data []byte, channel uint8) (*rak8nn.DataBlock, 
 	}
 	return db, nil
 }
+*/
 
 /* This is a simple example of using the library.
 * 1) Create a devce
@@ -42,6 +47,7 @@ func upload(n rak8nn.Networker, data []byte, channel uint8) (*rak8nn.DataBlock, 
 
 func main() {
 
+	// create the device
 	d, err := rak8nn.NewDevice("RAK811", 0, 115200)
 
 	// Give me time too get terminal started
@@ -52,21 +58,25 @@ func main() {
 		return
 	}
 
-	err = join(d)
+	// Connect device to network
+	err = lorawan.Join(d)
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// Send some test data
 	var data []byte = []byte("aabbcc")
 	var cha uint8 = 100
 
-	r, err := upload(d, data, cha)
+	r, err := lorawan.Send(d, data, cha)
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(r) // The return data.
+
+	// Print the return data block type rak8nn.DataBlock
+	fmt.Println(r)
 }
