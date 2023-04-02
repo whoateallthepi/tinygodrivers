@@ -10,24 +10,32 @@ import (
 )
 
 // masks
-const ()
+const (
+	alarmNumber  = 1
+	interruptPin = machine.GP3
+)
+
+type clock ds3231.Clocker // Interface
 
 func main() {
 	alarmChannel := make(chan int, 1)
-	alarm := machine.GP3
+
+	// Configure the interrupt pi for the alarm
+	alarm := interruptPin
 	alarm.Configure(machine.PinConfig{Mode: machine.PinInput})
 
 	machine.I2C0.Configure(machine.I2CConfig{SCL: machine.GP21,
 		SDA: machine.GP20,
 	})
 
-	rtc := ds3231.New(machine.I2C0)
-	rtc.Configure()
+	d := ds3231.New(machine.I2C0) // device implementing clocker interface
+	clock.Configure(&d)
 
+	// Rountine to receive and acknowledge the alarm going off
 	go func() {
 		for {
 			_ = <-alarmChannel
-			dt, err := rtc.Read()
+			dt, err := clock.Read(&d)
 			if err != nil {
 				fmt.Println("Error reading date:", err)
 			} else {
@@ -36,36 +44,35 @@ func main() {
 
 			time.Sleep(time.Second)
 
-			rtc.SilenceAlarm(1)
+			clock.SilenceAlarm(&d, alarmNumber)
 
 		}
 
 	}()
 
-	valid := rtc.IsTimeValid()
-	valid = false
+	valid := clock.IsTimeValid(&d)
+	//valid = false
 	if !valid {
 		date := time.Date(2022, 12, 05, 20, 34, 12, 0, time.UTC)
-		rtc.Set(date)
+		clock.Set(&d, date)
 	}
-
-	running := rtc.IsRunning()
-	if !running {
-		err := rtc.SetRunning(true)
-		if err != nil {
-			fmt.Println("Error configuring RTC")
+	/*
+		running := rtc.IsRunning()
+		if !running {
+			err := rtc.SetRunning(true)
+			if err != nil {
+				fmt.Println("Error configuring RTC")
+			}
 		}
-	}
-
+	*/
+	fmt.Println("Reading the clock a few times")
 	for x := 0; x < 5; x++ {
-		dt, err := rtc.Read()
+		dt, err := clock.Read(&d)
 		if err != nil {
 			fmt.Println("Error reading date:", err)
 		} else {
 			fmt.Printf("Date: %d/%s/%02d %02d:%02d:%02d \r\n", dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second())
 		}
-		temp, _ := rtc.ReadTemperature()
-		fmt.Printf("Temperature: %.2f C \r\n\n", float32(temp)/1000)
 
 		time.Sleep(time.Second * 5)
 	}
@@ -86,79 +93,96 @@ func main() {
 		//rtc.SilenceAlarm(1)
 	})
 
-	fmt.Println("trying to set alarm - every second ")
-	dt, err := rtc.Read()
+	fmt.Println("\ntrying to set alarm - every second ")
+	banner()
+
+	dt, err := clock.Read(&d)
+	dt = dt.Add(time.Second * 10)
 	if err != nil {
 		fmt.Println("Error reading date:", err)
 		return
 	}
-
-	err = rtc.SetAlarm(dt.Add(time.Second*10), 1, ds3231.Secondly) // Set time for 10s in future
+	fmt.Printf("Alarm time: %02d:%02d:%02d\n", dt.Hour(), dt.Minute(), dt.Second())
+	err = clock.SetAlarm(&d, dt, alarmNumber, ds3231.Secondly) // Set time for 10s in future
 
 	if err != nil {
 
 		fmt.Println("Error setting alarm:", err)
-		return
+		fmt.Println("Trying next test")
 	}
-	time.Sleep(time.Second * 20)
+	time.Sleep(time.Second * 10)
+
 	fmt.Println("Switching alarm off")
-	time.Sleep(time.Second * 1)
+	clock.TurnOffAlarm(&d, alarmNumber)
 
-	rtc.TurnOffAlarm(1)
+	fmt.Println("\ntrying to set alarm - every minute")
+	banner()
 
-	fmt.Println("trying to set alarm - every minute")
-
-	dt, err = rtc.Read()
+	dt, err = clock.Read(&d)
+	dt = dt.Add(time.Second * 10)
 	if err != nil {
 		fmt.Println("Error reading date:", err)
 		return
 	}
 
-	err = rtc.SetAlarm(dt.Add(time.Second*10), 1, ds3231.Minutely) // Set time for 10s in future
+	fmt.Printf("Alarm time: %02d:%02d:%02d\n", dt.Hour(), dt.Minute(), dt.Second())
+	err = clock.SetAlarm(&d, dt, alarmNumber, ds3231.Minutely) // Set time for 10s in future
 
 	if err != nil {
 
 		fmt.Println("Error setting alarm:", err)
-		return
+		fmt.Println("Trying next test")
 	}
+	time.Sleep(time.Second * 200)
 
-	time.Sleep(time.Minute * 5)
+	clock.TurnOffAlarm(&d, alarmNumber)
+	time.Sleep(time.Minute * 1)
 
-	fmt.Println("trying to set alarm - every hour ")
-	dt, err = rtc.Read()
+	fmt.Println("\ntrying to set alarm - every hour ")
+	banner()
+	dt, err = clock.Read(&d)
+	dt = dt.Add(time.Second * 10)
 	if err != nil {
 		fmt.Println("Error reading date:", err)
 		return
 	}
 
-	err = rtc.SetAlarm(dt.Add(time.Second*10), 1, ds3231.Hourly) // Set time for 10s in future
+	fmt.Printf("Alarm time: %02d:%02d:%02d\n", dt.Hour(), dt.Minute(), dt.Second())
+	err = clock.SetAlarm(&d, dt, alarmNumber, ds3231.Hourly) // Set time for 10s in future
 
 	if err != nil {
 
 		fmt.Println("Error setting alarm:", err)
-		return
+		fmt.Println("Trying next test")
 	}
 	time.Sleep(time.Minute * 190)
+
 	fmt.Println("Switching alarm off")
 	time.Sleep(time.Second * 1)
-	rtc.TurnOffAlarm(1)
+	clock.TurnOffAlarm(&d, alarmNumber)
 
-	fmt.Println("trying to set alarm - every Day")
+	fmt.Println("\ntrying to set alarm - every Day")
+	banner()
 
-	dt, err = rtc.Read()
+	dt, err = clock.Read(&d)
+	dt = dt.Add(time.Second * 10)
 	if err != nil {
 		fmt.Println("Error reading date:", err)
 		return
 	}
 
-	err = rtc.SetAlarm(dt.Add(time.Second*10), 1, ds3231.Daily) // Set time for 10s in future
+	fmt.Printf("Alarm time: %02d:%02d:%02d\n", dt.Hour(), dt.Minute(), dt.Second())
+	err = clock.SetAlarm(&d, dt, alarmNumber, ds3231.Daily) // Set time for 10s in future
 
 	if err != nil {
 
 		fmt.Println("Error setting alarm:", err)
-		return
+		fmt.Println("Trying next test")
 	}
 
 	time.Sleep(time.Hour * 250) // Just wait for interrupts...
 
+}
+func banner() {
+	fmt.Println("*******************************************\n")
 }
