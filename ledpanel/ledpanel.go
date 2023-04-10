@@ -80,7 +80,7 @@ const (
 	flashinterval = 250 // gap between flashes
 )
 
-// LedControl is a single byte used to control which leds flash,
+// Control is a single byte used to control which leds flash,
 // how many times and for how long.
 //
 // Bits:
@@ -92,16 +92,16 @@ const (
 //	1 = 2		1 = medium
 //	2 = 3		2 = long
 //	3 = 4		3 = very long
-type LedControl uint8
+type Control uint8
 
-// Leds is used to hold the pins to which the leds are connected -
+// Pins is used to hold the pins to which the leds are connected -
 // used in LedPanel struct
-type Leds []machine.Pin
+type Pins []machine.Pin
 
 // FlashDurations contains the durations for each plash length - see LedPanel
 type FlashDurations [durationLimit]uint8
 
-// LedPanel defines a panel of up to 4 Leds. LedPins is the hardware pins to which
+// Panel defines a panel of up to 4 Leds. LedPins is the hardware pins to which
 // the leds are connected. Durations is the time intervals
 // for which the leds are lit in milliseconds.
 //
@@ -123,45 +123,45 @@ type FlashDurations [durationLimit]uint8
 //				durations[1] = mediumFlash
 //				durations[2] = longflash
 //				durations[3] = veryLongFlash
-type LedPanel struct {
-	ledPins   Leds
-	durations FlashDurations
+type Panel struct {
+	Pins      Pins
+	Durations FlashDurations
 }
 
-// ConfigureLedPanel starts a goroutine and returns a channel to which a control byte
+// Configure  starts a goroutine and returns a channel to which a control byte
 // (type LedControl) is sent // to flash an led panel. Uses a goroutine that terminates when the channel is closed
-func ConfigureLedPanel(p LedPanel) (chan<- LedControl, error) {
+func Configure(p Panel) (chan<- Control, error) {
 
-	if len(p.ledPins) > pinLimit {
+	if len(p.Pins) > pinLimit {
 		return nil, errors.New("more than four pins supplied")
 	}
 
-	for _, l := range p.ledPins {
+	for _, l := range p.Pins {
 		l.Configure(machine.PinConfig{Mode: machine.PinOutput})
 		l.Low()
 	}
 
 	// add any un-allocated durations
 
-	for k, v := range p.durations {
+	for k, v := range p.Durations {
 		if v != 0 {
 			continue
 		}
 
 		switch k {
 		case 0:
-			p.durations[0] = shortflash
+			p.Durations[0] = shortflash
 		case 1:
-			p.durations[1] = mediumflash
+			p.Durations[1] = mediumflash
 		case 2:
-			p.durations[2] = longflash
+			p.Durations[2] = longflash
 		case 3:
-			p.durations[3] = verylongflash
+			p.Durations[3] = verylongflash
 		}
 
 	}
 
-	cc := make(chan LedControl)
+	cc := make(chan Control)
 
 	// fire off the go routine to 'listen' for control bytes
 	// need to add tidy up code
@@ -173,7 +173,7 @@ func ConfigureLedPanel(p LedPanel) (chan<- LedControl, error) {
 }
 
 // flashLeds reads from the channel and flashes the requested leds
-func flashLeds(p LedPanel, control <-chan LedControl) error {
+func flashLeds(p Panel, control <-chan Control) error {
 	fmt.Println(">> flashLeds")
 	for {
 		cc, ok := <-control
@@ -194,7 +194,7 @@ func flashLeds(p LedPanel, control <-chan LedControl) error {
 		flashes = 1 + (c&numberofFlashes)>>6
 		d := c & durationBits >> 4
 
-		duration = time.Duration(p.durations[d]) * time.Millisecond
+		duration = time.Duration(p.Durations[d]) * time.Millisecond
 
 		ledBits = c & selectedLeds
 
@@ -203,7 +203,7 @@ func flashLeds(p LedPanel, control <-chan LedControl) error {
 		// Time to flash...
 		for i = 0; i < flashes; i++ {
 			// light up the LEDs where the bit is set
-			for i, ll := range p.ledPins {
+			for i, ll := range p.Pins {
 				mask = (1 << i)
 				if ledBits&mask > 0 {
 					ll.High()
@@ -213,7 +213,7 @@ func flashLeds(p LedPanel, control <-chan LedControl) error {
 			time.Sleep(duration)
 
 			// Now switch off
-			for i, ll := range p.ledPins {
+			for i, ll := range p.Pins {
 				mask = (1 << i)
 				if ledBits&mask > 0 {
 					ll.Low()
