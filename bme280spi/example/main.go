@@ -42,10 +42,8 @@ func main() {
 		y := sr.Pressure
 		z := sr.Humidity
 
-		time.Sleep(time.Second * 10) // Wait a long time!
-
-		fmt.Printf("\nTemperature: %4.2f C\n", float64(x)/1000)
-		fmt.Printf("Pressure: %4.2f mB\n", float64(y)/100000)
+		fmt.Printf("\nTemperature: %4.2f C\n", float64(x)/100)
+		fmt.Printf("Pressure: %4.2f mB\n", float64(y)/100)
 		fmt.Printf("Humidity: %4.2f %%\n", float64(z)/100)
 
 		time.Sleep(time.Second * 5)
