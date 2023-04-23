@@ -73,11 +73,11 @@ const (
 )
 
 const (
-	shortflash    = 5 // milliseconds
-	mediumflash   = 100
-	longflash     = 500
-	verylongflash = 1000
-	flashinterval = 250 // gap between flashes
+	shortflash    = 1 // multiples of 10 milliseconds
+	mediumflash   = 10
+	longflash     = 50
+	verylongflash = 100
+	flashinterval = 250 // gap between flashes in milliseconds
 )
 
 // Control is a single byte used to control which leds flash,
@@ -194,7 +194,7 @@ func flashLeds(p Panel, control <-chan Control) error {
 		flashes = 1 + (c&numberofFlashes)>>6
 		d := c & durationBits >> 4
 
-		duration = time.Duration(p.Durations[d]) * time.Millisecond
+		duration = time.Duration(p.Durations[d]) * 10 * time.Millisecond
 
 		ledBits = c & selectedLeds
 
