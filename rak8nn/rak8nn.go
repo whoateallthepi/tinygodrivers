@@ -27,11 +27,11 @@ type Networker interface {
 }
 
 type DataBlock struct {
-	channel uint8
-	rssi    int16
-	snr     int16
-	bytes   uint8
-	data    []byte
+	Channel uint8
+	Rssi    int16
+	Snr     int16
+	Bytes   uint8
+	Data    []byte
 }
 
 // StatusErr is an implementation of error interface to include a Status integer
@@ -265,12 +265,12 @@ func (d *Device) command(command []byte) (commandResponse []byte, data *DataBloc
 				dd = []byte(s2[1])                      // What's left should be the data in hex
 			}
 
-			db := DataBlock{channel: uint8(i0),
+			db := DataBlock{Channel: uint8(i0),
 
-				rssi:  int16(i1),
-				snr:   int16(i2),
-				bytes: uint8(i3),
-				data:  dd,
+				Rssi:  int16(i1),
+				Snr:   int16(i2),
+				Bytes: uint8(i3),
+				Data:  dd,
 			}
 			return commandResponse, &db, 0, nil
 		}
