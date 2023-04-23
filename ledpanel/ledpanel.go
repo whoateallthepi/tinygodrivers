@@ -74,9 +74,9 @@ const (
 
 const (
 	shortflash    = 5 // milliseconds
-	mediumflash   = 10
-	longflash     = 20
-	verylongflash = 50
+	mediumflash   = 100
+	longflash     = 500
+	verylongflash = 1000
 	flashinterval = 250 // gap between flashes
 )
 

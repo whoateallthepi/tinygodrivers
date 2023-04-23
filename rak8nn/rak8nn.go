@@ -112,6 +112,8 @@ func (d *Device) Join() error {
 func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 
 	var command []byte
+	fmt.Println("data:")
+	fmt.Printf(uploadCommand, channel, data)
 	command = []byte(fmt.Sprintf(uploadCommand, channel, data))
 
 	_, dd, mc, err := d.command([]byte(command)) // discard command response (debugging only)
@@ -119,7 +121,7 @@ func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 	if err != nil {
 		return nil, StatusErr{
 			Status:  FailedtoSend,
-			Message: fmt.Sprintf("failed to connect to network modem code: %d", mc),
+			Message: fmt.Sprintf("failed to send data to network - modem code: %d", mc),
 		}
 	}
 
@@ -136,15 +138,14 @@ else {
 }
 */
 
-// Initialise does whatever I needed to get device ready for comms. At very least clears out
-// any unread bytes from I/O buffer
+// Initialise does whatever I needed to get device ready for comms.
+// At very least clears out any unread bytes from I/O buffer.
 func (d *Device) Initialise() error {
 
 	// Send a 'version' command - this wakes up the modem and we can read out the buffers
-
-	_, _, _, err := d.command([]byte(versionCommand))
-
-	return err
+	// Ignore any errors as these are typically garbage left in buffer
+	d.command([]byte(versionCommand))
+	return nil
 }
 
 // command is an internal utility to send an at-type command to the modem and interpret the response
