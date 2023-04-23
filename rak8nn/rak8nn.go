@@ -66,8 +66,11 @@ const (
 	versionCommand = "at+version\r\n"
 	uploadCommand  = "at+send=lora:%d:%s\r\n"
 	dataMessage    = "at+recv="
+	changeState    = "at+set_config=device:sleep:%d\r\n"
 	generalOK      = "OK"
 	errorResponse  = "ERROR:"
+	sleepOK        = "OK Sleep\r\n"
+	wakeOK         = "OK Wake Up\r\n"
 )
 
 func (se StatusErr) Error() string {
@@ -81,6 +84,12 @@ type Device struct {
 
 // Join an RAK8nn device to a LoraWan network
 func (d *Device) Join() error {
+
+	// wake the modem
+	err := d.changeState(0)
+	if err != nil {
+		fmt.Printf("*** failed to wake modem %s (continuing)\n", err)
+	}
 
 	var (
 		connected bool = false
@@ -99,6 +108,11 @@ func (d *Device) Join() error {
 	}
 
 	if connected {
+		//sleep the modem
+		err := d.changeState(1)
+		if err != nil {
+			fmt.Printf("*** failed to sleep modem %s (continuing)\n", err)
+		}
 		return nil
 	}
 
@@ -111,6 +125,11 @@ func (d *Device) Join() error {
 // Send (or 'upload') data
 func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 
+	// wake the modem
+	err := d.changeState(0)
+	if err != nil {
+		fmt.Printf("*** failed to wake modem %s (continuing)\n", err)
+	}
 	var command []byte
 	fmt.Println("data:")
 	fmt.Printf(uploadCommand, channel, data)
@@ -124,7 +143,11 @@ func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 			Message: fmt.Sprintf("failed to send data to network - modem code: %d", mc),
 		}
 	}
-
+	// sleep the modem
+	err = d.changeState(1)
+	if err != nil {
+		fmt.Printf("*** failed to sleep modem %s (continuing)\n", err)
+	}
 	return dd, nil
 }
 
@@ -256,7 +279,7 @@ func (d *Device) command(command []byte) (commandResponse []byte, data *DataBloc
 		return commandResponse, nil, 0, nil
 	}
 
-	// We rshould have processed all  the possible responses from modem
+	// We should have processed all  the possible responses from modem
 	// - so return an error if we get here
 
 	return commandResponse, data, modemCode, StatusErr{
@@ -264,6 +287,29 @@ func (d *Device) command(command []byte) (commandResponse []byte, data *DataBloc
 		Message: fmt.Sprintf("unrecognised response from modem: %s", commandResponse),
 	}
 
+}
+
+// changeState is an internal procedure used to switch the modem into/
+// out of low-power mode.
+// state = 1 = sleep
+// state = 0 = wake
+// Any other parameter will give a, possibly untrapped, error
+// Sending sleep to an already asleep modem will actually wake it up
+// this is left up to the calling program
+func (d *Device) changeState(state int8) error {
+
+	r, _, mc, err := d.command([]byte(fmt.Sprintf(changeState, state)))
+	if err != nil {
+		return err
+	}
+	if string(r) == wakeOK || string(r) == sleepOK {
+		return nil
+	}
+	if state == 1 && string(r) == sleepOK {
+		return nil
+	}
+	return StatusErr{Status: UnexpectedModemResponse,
+		Message: fmt.Sprintf("failed to sleep/wake modem: %d", mc)}
 }
 
 // NewRak8nnDevice is a generator fuction to create an RAK8nn device instance
