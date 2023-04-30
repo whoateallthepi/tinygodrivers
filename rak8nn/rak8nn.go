@@ -50,11 +50,13 @@ const (
 	FailedtoSend
 	UnexpectedModemResponse
 	UnrecoverableError
+	NetworkNotConnected
 )
 
 // program control constants
 const (
 	joinRetries = 5  // Number of times to try joiniing LoraWan network
+	retryDelay  = 5  // Delay in seconds between retrying to connect
 	charDelay   = 50 //  Milliseconds to pause between each character to avoid
 	// prematurely exhausing buffer
 	commandDelay = 500 // Milliseconds to wait after command to check the modem buffer
@@ -104,9 +106,8 @@ func (d *Device) Join() error {
 			connected = true
 			break
 		}
-
+		time.Sleep(time.Second * retryDelay)
 	}
-
 	if connected {
 		//sleep the modem
 		err := d.changeState(1)
@@ -131,8 +132,10 @@ func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 		fmt.Printf("*** failed to wake modem %s (continuing)\n", err)
 	}
 	var command []byte
+	/* diag
 	fmt.Println("data:")
 	fmt.Printf(uploadCommand, channel, data)
+	*/
 	command = []byte(fmt.Sprintf(uploadCommand, channel, data))
 
 	_, dd, mc, err := d.command([]byte(command)) // discard command response (debugging only)
@@ -274,8 +277,8 @@ func (d *Device) command(command []byte) (commandResponse []byte, data *DataBloc
 			}
 			return commandResponse, &db, 0, nil
 		}
-		// This is the return for no data from network, eg a at+version\r\n command
 
+		// This is the return for no data from network, eg a at+version\r\n command
 		return commandResponse, nil, 0, nil
 	}
 
