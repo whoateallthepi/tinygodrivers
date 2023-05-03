@@ -30,7 +30,7 @@ package ledpanel
 
 import (
 	"errors"
-	"fmt"
+	//"fmt"
 	"machine"
 	"time"
 )
@@ -174,7 +174,7 @@ func Configure(p Panel) (chan<- Control, error) {
 
 // flashLeds reads from the channel and flashes the requested leds
 func flashLeds(p Panel, control <-chan Control) error {
-	fmt.Println(">> flashLeds")
+	//fmt.Println(">> flashLeds")
 	for {
 		cc, ok := <-control
 		if !ok {
@@ -184,7 +184,7 @@ func flashLeds(p Panel, control <-chan Control) error {
 
 		c := uint8(cc)
 
-		fmt.Printf("c: %d\n", c)
+		//fmt.Printf("c: %d\n", c)
 
 		// get flashes
 
@@ -198,7 +198,7 @@ func flashLeds(p Panel, control <-chan Control) error {
 
 		ledBits = c & selectedLeds
 
-		fmt.Printf("flashes:%d duration: %s ledBits: %d\n", flashes, duration, ledBits)
+		//fmt.Printf("flashes:%d duration: %s ledBits: %d\n", flashes, duration, ledBits)
 
 		// Time to flash...
 		for i = 0; i < flashes; i++ {
