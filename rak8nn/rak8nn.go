@@ -180,9 +180,17 @@ func (d *Device) Initialise() error {
 // All commands are a bit slow - join in particular takes seconds.
 func (d *Device) command(command []byte) (commandResponse []byte, data *DataBlock, modemCode int64, err error) {
 
-	// No validation at this stage!
+	// To help with 'unexpected' situations, read and ditch anything in the
+	// buffer before sending any command
 
-	//response := make([]byte, 10)
+	for {
+		if d.uart.Buffered() > 0 {
+			d.uart.ReadByte()
+			time.Sleep(charDelay * time.Millisecond) // Slow it down a bit
+		} else {
+			break
+		}
+	}
 
 	d.uart.Write(command)
 
