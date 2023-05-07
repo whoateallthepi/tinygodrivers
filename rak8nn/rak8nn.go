@@ -57,7 +57,7 @@ const (
 const (
 	joinRetries = 5  // Number of times to try joiniing LoraWan network
 	retryDelay  = 5  // Delay in seconds between retrying to connect
-	charDelay   = 50 //  Milliseconds to pause between each character to avoid
+	charDelay   = 75 //  Milliseconds to pause between each character to avoid
 	// prematurely exhausing buffer
 	commandDelay = 500 // Milliseconds to wait after command to check the modem buffer
 )
