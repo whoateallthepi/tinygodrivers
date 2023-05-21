@@ -13,4 +13,4 @@ lint: fmt
 #.PHONY:vet
 
 build: lint #vet
-	tinygo build -opt=0 -target=pico -o bin/main.elf main.go
+	tinygo build   -target=pico -o bin/main.elf main.go

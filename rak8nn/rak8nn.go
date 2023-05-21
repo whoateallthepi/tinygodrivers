@@ -79,7 +79,6 @@ func (se StatusErr) Error() string {
 	return se.Message
 }
 
-// Device is an implementation of Interface Network for RAK8nn devices - currently only RAK811 supported
 type Device struct {
 	uart *machine.UART
 }
@@ -123,8 +122,15 @@ func (d *Device) Join() error {
 	}
 }
 
-// Send (or 'upload') data
-func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
+// Send (or 'upload') data returns channel (uint8), rssi (int16), snr (int16),
+// byte count (uint8) and any incoming data byte[]
+func (d *Device) Send(data []byte, channel uint8) (
+	uint8, // channel
+	int16, // rssi
+	int16, // Snr
+	uint8, // byte count
+	[]byte, // data
+	error) {
 
 	// wake the modem
 	err := d.changeState(0)
@@ -138,10 +144,14 @@ func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 	*/
 	command = []byte(fmt.Sprintf(uploadCommand, channel, data))
 
+	//fmt.Printf("about to send; %s\n", command)
+
 	_, dd, mc, err := d.command([]byte(command)) // discard command response (debugging only)
 
+	//fmt.Printf("back from send\n")
+
 	if err != nil {
-		return nil, StatusErr{
+		return 0, 0, 0, 0, nil, StatusErr{
 			Status:  FailedtoSend,
 			Message: fmt.Sprintf("failed to send data to network - modem code: %d", mc),
 		}
@@ -151,7 +161,13 @@ func (d *Device) Send(data []byte, channel uint8) (*DataBlock, error) {
 	if err != nil {
 		fmt.Printf("*** failed to sleep modem %s (continuing)\n", err)
 	}
-	return dd, nil
+
+	if dd != nil {
+		return dd.Channel, dd.Rssi, dd.Snr, dd.Bytes, dd.Data, nil
+	} else {
+		// rarely we get a nil datablock back although the send has worked
+		return 0, 0, 0, 0, nil, nil
+	}
 }
 
 // Status is the status of a device to the network
@@ -360,26 +376,4 @@ func NewDevice(deviceType string, uart uint8, baudRate uint32) (*Device, error) 
 
 	return &d, err
 
-}
-
-func join(n Networker) error {
-	err := n.Join()
-	return err
-}
-
-func status(n Networker) (uint8, error) {
-	return 0, nil
-}
-
-func upload(n Networker, data []byte, channel uint8) (*DataBlock, error) {
-
-	db, err := n.Send(data, channel)
-
-	if err != nil {
-		return nil, StatusErr{
-			Status:  FailedtoSend,
-			Message: fmt.Sprintf("failed to send: %s", err),
-		}
-	}
-	return db, nil
 }
