@@ -147,7 +147,7 @@ func (d *DeviceSPI) Configure() error {
 
 	id := d.readRegister(0xD0)
 
-	if id != 0x60 {
+	if id != 0x60 && id != 0x58 {
 		return fmt.Errorf("unrecognised device. ChipID:%d", id)
 	}
 
@@ -201,7 +201,7 @@ func (d *DeviceSPI) Configure() error {
 	if err != nil {
 		return StatusErr{
 			Status:  FailedToReadCompensation,
-			Message: fmt.Sprintf("failed to read callibration  registers"),
+			Message: fmt.Sprintf("failed to read calibration  registers"),
 		}
 	}
 
@@ -214,6 +214,7 @@ func (d *DeviceSPI) Configure() error {
 	}
 
 	h2lsb, err := d.readRegisters(REG_CALIBRATION_H2LSB, lengthH2LSB)
+	//fmt.Printf("h2lsb: %x", h2lsb)
 
 	if err != nil {
 		return StatusErr{
@@ -237,9 +238,9 @@ func (d *DeviceSPI) Configure() error {
 	d.calibrationCoefficients.h1 = h1[0]
 	d.calibrationCoefficients.h2 = readIntLE(h2lsb[0], h2lsb[1])
 	d.calibrationCoefficients.h3 = h2lsb[2]
-	d.calibrationCoefficients.h6 = int8(h2lsb[6])
+	d.calibrationCoefficients.h6 = int8(h2lsb[7])
 	d.calibrationCoefficients.h4 = 0 + (int16(h2lsb[3]) << 4) | (int16(h2lsb[4] & 0x0F))
-	d.calibrationCoefficients.h5 = 0 + (int16(h2lsb[5]) << 4) | (int16(h2lsb[4]) >> 4)
+	d.calibrationCoefficients.h5 = 0 + (int16(h2lsb[5]) >> 4) | (int16(h2lsb[6]) << 4)
 
 	d.reset() // Find out why!
 
@@ -460,7 +461,7 @@ func (d *DeviceSPI) calculateTemp(data []byte) (int32, int32, error) {
 func (d *DeviceSPI) calculateHumidity(data []byte, tFine int32) (uint32, error) {
 
 	rawHumidity := convert2Bytes(data[6], data[7])
-
+	//fmt.Printf("Raw Humidity: %d\n tFine: %d\n", rawHumidity, tFine)
 	h := float32(tFine) - 76800
 
 	if h == 0 {
@@ -479,6 +480,8 @@ func (d *DeviceSPI) calculateHumidity(data []byte, tFine int32) (uint32, error) 
 
 	h = var1 * var2
 	h = h * (1 - float32(d.calibrationCoefficients.h1)*h/524288)
+
+	//fmt.Printf("h: %02.2f\n", h)
 	return uint32(100 * h), nil
 
 }

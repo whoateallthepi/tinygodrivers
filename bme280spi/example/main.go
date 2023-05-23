@@ -15,7 +15,7 @@ type sensor bme280spi.Sensor
 
 func main() {
 
-	time.Sleep(time.Second * 5) // time to get terminal up
+	time.Sleep(time.Second * 10) // time to get terminal up
 
 	fmt.Printf("bme280spi driver example \n")
 	fmt.Printf("************************ \n")
